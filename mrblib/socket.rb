@@ -236,6 +236,12 @@ class TCPSocket
       Addrinfo.foreach(host, service) { |ai|
         begin
           s = Socket._socket(ai.afamily, Socket::SOCK_STREAM, 0)
+          if local_host or local_service
+            local_host ||= (ai.afamily == Socket::AF_INET) ? "0.0.0.0" : "::"
+            local_service ||= "0"
+            bi = Addrinfo.getaddrinfo(local_host, local_service, ai.afamily, ai.socktype)[0]
+            Socket._bind(s, bi.to_sockaddr)
+          end
           Socket._connect(s, ai.to_sockaddr)
           super(s, "r+")
           return
@@ -262,6 +268,9 @@ class TCPServer
     ai = Addrinfo.getaddrinfo(host, service, nil, nil, nil, Socket::AI_PASSIVE)[0]
     @init_with_fd = true
     super(Socket._socket(ai.afamily, Socket::SOCK_STREAM, 0), "r+")
+    if Socket.const_defined?(:SO_REUSEADDR)
+      self.setsockopt(Socket::SOL_SOCKET, Socket::SO_REUSEADDR, true)
+    end
     Socket._bind(self.fileno, ai.to_sockaddr)
     listen(5)
     self
